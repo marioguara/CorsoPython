@@ -1,6 +1,7 @@
 from django.contrib import admin
+from django.core.mail import send_mail
 
-from anagrafica.models import Persona, Studente , Compito, Materia
+from anagrafica.models import Persona, Studente , Compito, Materia, Genitore, Professore
 
 
 class PersonaAdmin(admin.ModelAdmin):
@@ -31,3 +32,18 @@ class CompitoAdmin(admin.ModelAdmin):
 admin.site.register(Compito, CompitoAdmin)
 
 admin.site.register(Materia)
+class GenitoreAdmin(PersonaAdmin):
+    fieldsets = (
+        ('Dati persona', {'fields': (('nome', "cognome"), "data_di_nascita")}),
+        ('Dati figlio', {'fields': ('figlio',)}),
+        ('Dati email', {'fields': ('email',)}),
+    )
+admin.site.register(Genitore, GenitoreAdmin)
+class ProfessoreAdmin(PersonaAdmin):
+    fieldsets = (
+        ('Dati persona', {'fields': (('nome', "cognome"), "data_di_nascita")}),
+        ('Indirizzo', {'fields': ('indirizzo',)}),
+        ('Materia insegnante', {'fields': ('materia',)}),
+        ('Media voti classe', {'fields': ('voto',)}),
+    )
+admin.site.register(Professore, ProfessoreAdmin)
