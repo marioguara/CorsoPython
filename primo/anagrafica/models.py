@@ -1,5 +1,6 @@
 import email
 import os
+import uuid
 import smtplib
 from datetime import datetime
 from email.mime.application import MIMEApplication
@@ -7,7 +8,7 @@ from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.utils import formatdate
+from email.utils import formatdate, COMMASPACE
 from os.path import basename
 from xml.dom import ValidationErr
 
@@ -77,14 +78,22 @@ class Materia(models.Model):
     def __str__(self):
         return str(self.nome_materia)
 
+def get_file_path(instance, filename):
+    directory_string_var = 'file/default_directory_string_var'
+    ext = filename.split('.')[-1]
+    print(ext)
+    filename = "%s-%s.%s" % (instance.studente, instance.tipo_compito, ext)
+    print(filename)
+    return os.path.join(directory_string_var, filename)
 
 class Compito(models.Model):
     tipo_compito = models.ForeignKey(Materia, max_length=15, blank=False, on_delete=models.CASCADE)
     studente = models.ForeignKey(Studente, blank=False, null=False, on_delete=models.CASCADE)
     voto = models.PositiveSmallIntegerField()
-    allegato = models.FileField(upload_to='file', blank=True, null=True)
+    allegato = models.FileField(upload_to=get_file_path, blank=True, null=True)
 
-    def sendmail(self):
+
+    """def sendmail4(self):
         msg = MIMEText(f"IL VOTO DEL COMPITO E: {self.voto} <br> LA MEDIA DI TUTTI I VOTI E: {self.studente.voto}",'html')
         genitori = Genitore.objects.filter(figlio=self.studente)
         destinatari = []
@@ -99,8 +108,35 @@ class Compito(models.Model):
         msg = MIMEMultipart()
         msg.attach(MIMEImage(self.allegato("download.pdf").read()))
         s.sendmail(from_addr='service.signalling@mermec.com', to_addrs=destinatari, msg=msg.as_string())
-        s.quit()
+        s.quit()"""
 
+    def sendmail(self):
+        msg = MIMEMultipart("alternative")
+        html = f"<p>IL VOTO DEL COMPITO E: {self.voto} <br> LA MEDIA DI TUTTI I VOTI E: {self.studente.voto}</p>"
+        genitori = Genitore.objects.filter(figlio=self.studente)
+        destinatari = []
+        for genitore in genitori :
+            destinatari.append(genitore.email)
+        msg['Subject'] = f"ESITO COMPITO DI {self.tipo_compito} dell'alunno {self.studente}"
+        msg['To'] = COMMASPACE.join(destinatari)
+        msg['From'] = 'service.signalling@mermec.com'
+
+        msg.attach(MIMEText(html, 'html'))
+        s = smtplib.SMTP_SSL('smtps.aruba.it:465')
+        s.login('service.signalling@mermec.com', 'SerVice!2019')
+
+        if  self.allegato :
+            with open(str(self.allegato), "rb") as file:
+                part = MIMEApplication(
+                    file.read(),
+                    Name=basename(str(self.allegato))
+                )
+
+            part['Content-Disposition'] = 'attachment; filename = %s' % (str(self.allegato).split("/")[2])
+            msg.attach(part)
+        print(destinatari)
+        s.sendmail(from_addr='service.signalling@mermec.com', to_addrs=destinatari, msg=msg.as_string())
+        s.quit()
 
     def clean(self):
         if self.voto > 30:
@@ -128,6 +164,7 @@ class Compito(models.Model):
         studente.voto = media
         studente.save()
         self.sendmail()
+
 
 class Professore(Persona):
     materia = models.ForeignKey(Materia, max_length=15, blank=False, on_delete=models.CASCADE)
